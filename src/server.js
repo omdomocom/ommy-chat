@@ -15,15 +15,15 @@ app.use(express.json());
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-// Rate limiting: máx 20 mensajes por minuto por IP
+// Rate limiting: máx 10 mensajes por minuto por IP
 const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiados mensajes. Espera un momento.' },
@@ -36,8 +36,8 @@ app.use('/widget', express.static(join(__dirname, '../public'), {
 
 /**
  * POST /chat
- * Body: { session_id: string, message: string, lang?: 'es'|'en' }
- * Response: { reply: string }
+ * Body: { session_id, message, lang?, customer?, viewed_products? }
+ * Response: { reply, products? }
  */
 app.post('/chat', chatLimiter, async (req, res) => {
   const { session_id, message, lang, customer, viewed_products } = req.body;
@@ -47,11 +47,11 @@ app.post('/chat', chatLimiter, async (req, res) => {
   }
 
   try {
-    const reply = await agent.chat(session_id, message, lang, customer, viewed_products);
-    res.json({ reply });
+    const result = await agent.chat(session_id, message, lang, customer, viewed_products);
+    res.json(result);
   } catch (err) {
     console.error('Error en el agente:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Error procesando tu mensaje. Por favor intenta de nuevo.' });
   }
 });
 
@@ -69,51 +69,20 @@ app.get('/collections', async (req, res) => {
 });
 
 /**
- * DELETE /chat/:session_id
- * Limpia el historial de conversación de una sesión
+ * POST /feedback — registra feedback de una respuesta del agente
  */
-app.delete('/chat/:session_id', (req, res) => {
-  agent.clearSession(req.params.session_id);
+app.post('/feedback', async (req, res) => {
+  const { session_id, message_index, value } = req.body;
+  console.log(`Feedback [${value}] session=${session_id} msg=${message_index}`);
   res.json({ ok: true });
 });
 
 /**
- * GET /ommy-chat  ← OAuth callback de Shopify
+ * DELETE /chat/:session_id — limpia el historial
  */
-app.get('/ommy-chat', async (req, res) => {
-  const { code, shop, hmac, state } = req.query;
-
-  if (!code || !shop) {
-    return res.status(400).send('Faltan parámetros OAuth');
-  }
-
-  try {
-    const params = new URLSearchParams({
-      client_id: process.env.SHOPIFY_CLIENT_ID,
-      client_secret: process.env.SHOPIFY_CLIENT_SECRET,
-      code,
-    });
-    const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
-    });
-    console.log('\nShopify status:', tokenRes.status, tokenRes.url);
-    const text = await tokenRes.text();
-    console.log('\nRespuesta Shopify OAuth:', text.slice(0, 300));
-    let data;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-    if (data.access_token) {
-      console.log('\n✅ ACCESS TOKEN:', data.access_token);
-      res.send(`<h2>✅ Token obtenido</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
-    } else {
-      res.send(`<h2>❌ Error de Shopify</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
-    }
-  } catch (err) {
-    console.error('Error OAuth:', err);
-    res.status(500).send(`Error: ${err.message}`);
-  }
+app.delete('/chat/:session_id', async (req, res) => {
+  await agent.clearSession(req.params.session_id);
+  res.json({ ok: true });
 });
 
 /**

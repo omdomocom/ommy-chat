@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { toolDefinitions, executeTool } from './tools.js';
+import { loadSession, saveSession, deleteSession, cleanOldSessions, initDB } from './db.js';
+
+const USE_DB = !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME);
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -96,21 +99,30 @@ function getSystemPrompt(lang) {
 export class OmmyAgent {
   constructor() {
     this.sessions = new Map();
+    if (USE_DB) initDB().catch(console.error);
   }
 
-  getOrCreateSession(sessionId) {
-    if (!this.sessions.has(sessionId)) {
-      this.sessions.set(sessionId, { messages: [] });
+  async getOrCreateSession(sessionId) {
+    if (this.sessions.has(sessionId)) return this.sessions.get(sessionId);
+    if (USE_DB) {
+      const saved = await loadSession(sessionId);
+      if (saved) {
+        this.sessions.set(sessionId, saved);
+        return saved;
+      }
     }
-    return this.sessions.get(sessionId);
+    const session = { messages: [] };
+    this.sessions.set(sessionId, session);
+    return session;
   }
 
-  clearSession(sessionId) {
+  async clearSession(sessionId) {
     this.sessions.delete(sessionId);
+    if (USE_DB) await deleteSession(sessionId).catch(() => {});
   }
 
   async chat(sessionId, userMessage, lang = 'es', customer = null, viewedProducts = []) {
-    const session = this.getOrCreateSession(sessionId);
+    const session = await this.getOrCreateSession(sessionId);
     session.messages.push({ role: 'user', content: userMessage });
 
     let systemPrompt = getSystemPrompt(lang);
@@ -135,6 +147,8 @@ export class OmmyAgent {
     });
 
     // Loop agentico: sigue procesando tool_use hasta que stop_reason sea 'end_turn'
+    let lastProducts = null;
+
     while (response.stop_reason === 'tool_use') {
       const assistantMessage = { role: 'assistant', content: response.content };
       session.messages.push(assistantMessage);
@@ -146,6 +160,10 @@ export class OmmyAgent {
             let result;
             try {
               result = await executeTool(toolUse.name, toolUse.input);
+              // Captura los productos de la última búsqueda para devolver como cards
+              if (toolUse.name === 'search_products' && Array.isArray(result)) {
+                lastProducts = result;
+              }
             } catch (err) {
               result = { error: err.message };
             }
@@ -176,10 +194,29 @@ export class OmmyAgent {
     session.messages.push({ role: 'assistant', content: finalText });
 
     // Limita el historial a las últimas 40 entradas para evitar tokens excesivos
+    // Limita el historial + limpia sesiones inactivas >30min
     if (session.messages.length > 40) {
       session.messages = session.messages.slice(-40);
     }
+    session.lastActivity = Date.now();
 
-    return finalText;
+    if (USE_DB) {
+      await saveSession(sessionId, session.messages, lang).catch(console.error);
+      cleanOldSessions().catch(() => {});
+    } else {
+      this.cleanInactiveSessions();
+    }
+
+    return { reply: finalText, products: lastProducts };
+  }
+
+  cleanInactiveSessions() {
+    const TIMEOUT = 30 * 60 * 1000;
+    const now = Date.now();
+    for (const [id, session] of this.sessions) {
+      if (session.lastActivity && now - session.lastActivity > TIMEOUT) {
+        this.sessions.delete(id);
+      }
+    }
   }
 }

@@ -320,6 +320,81 @@
       border-radius: 20px;
     }
 
+    /* Product cards */
+    .ommy-product-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 6px;
+      max-width: 100%;
+    }
+    .ommy-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      gap: 10px;
+      padding: 8px;
+      align-items: center;
+    }
+    .ommy-card img {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 8px;
+      flex-shrink: 0;
+      background: #f5f5f5;
+    }
+    .ommy-card-info { flex: 1; min-width: 0; }
+    .ommy-card-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #1a1a1a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ommy-card-price {
+      font-size: 12px;
+      color: #555;
+      margin: 2px 0 6px;
+    }
+    .ommy-card-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+    .ommy-card-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: opacity 0.15s;
+    }
+    .ommy-card-btn:hover { opacity: 0.8; }
+    .ommy-card-btn-view { background: #f5f5f5; color: #1a1a1a; }
+    .ommy-card-btn-cart { background: #F5C518; color: #1a1a1a; }
+
+    /* Feedback */
+    .ommy-feedback {
+      display: flex;
+      gap: 6px;
+      margin-top: 5px;
+      align-self: flex-start;
+    }
+    .ommy-fb-btn {
+      background: none;
+      border: 1px solid #e8e8e8;
+      border-radius: 20px;
+      padding: 2px 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .ommy-fb-btn:hover { background: #f5f5f5; }
+    .ommy-fb-btn.ommy-fb-active { background: #FFF9E0; border-color: #F5C518; }
+
     /* Quick options */
     #ommy-options {
       padding: 4px 14px 10px;
@@ -563,9 +638,12 @@
 
   // ── Chat logic ─────────────────────────────────────────────────────────────
 
-  function appendMessage(text, role) {
+  let messageIndex = 0;
+
+  function appendMessage(text, role, products = null) {
     const msgs = document.getElementById('ommy-messages');
     const typing = document.getElementById('ommy-typing');
+    const idx = messageIndex++;
 
     const wrap = document.createElement('div');
     wrap.className = `ommy-msg ommy-msg-${role}`;
@@ -573,8 +651,72 @@
     const bubble = document.createElement('div');
     bubble.className = 'ommy-bubble';
     bubble.textContent = text;
-
     wrap.appendChild(bubble);
+
+    // Product cards
+    if (role === 'bot' && products?.length) {
+      const cards = document.createElement('div');
+      cards.className = 'ommy-product-cards';
+      products.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'ommy-card';
+        const img = p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.title}" loading="lazy">` : '';
+        const price = p.price ? `<div class="ommy-card-price">€${p.price}</div>` : '';
+        const variantId = p.variants?.[0]?.id;
+        const cartBtn = variantId
+          ? `<button class="ommy-card-btn ommy-card-btn-cart" data-variant="${variantId}">🛒 Carrito</button>`
+          : '';
+        card.innerHTML = `
+          ${img}
+          <div class="ommy-card-info">
+            <div class="ommy-card-title">${p.title}</div>
+            ${price}
+            <div class="ommy-card-actions">
+              <a class="ommy-card-btn ommy-card-btn-view" href="/products/${p.handle}" target="_blank">Ver</a>
+              ${cartBtn}
+            </div>
+          </div>`;
+        card.querySelector('.ommy-card-btn-cart')?.addEventListener('click', async (e) => {
+          const btn = e.currentTarget;
+          btn.textContent = '...';
+          try {
+            await fetch('/cart/add.js', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: Number(btn.dataset.variant), quantity: 1 }),
+            });
+            btn.textContent = '✓ Agregado';
+            btn.style.background = '#22c55e';
+            btn.style.color = '#fff';
+          } catch (_) { btn.textContent = '🛒 Carrito'; }
+        });
+        cards.appendChild(card);
+      });
+      wrap.appendChild(cards);
+    }
+
+    // Feedback buttons (solo en mensajes del bot)
+    if (role === 'bot') {
+      const fb = document.createElement('div');
+      fb.className = 'ommy-feedback';
+      ['👍', '👎'].forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.className = 'ommy-fb-btn';
+        btn.textContent = emoji;
+        btn.addEventListener('click', () => {
+          fb.querySelectorAll('.ommy-fb-btn').forEach(b => b.classList.remove('ommy-fb-active'));
+          btn.classList.add('ommy-fb-active');
+          fetch(`${API_URL}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: SESSION_ID, message_index: idx, value: emoji }),
+          }).catch(() => {});
+        });
+        fb.appendChild(btn);
+      });
+      wrap.appendChild(fb);
+    }
+
     msgs.insertBefore(wrap, typing);
     scrollToBottom();
   }
@@ -618,7 +760,7 @@
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
       setTyping(false);
-      appendMessage(data.reply, 'bot');
+      appendMessage(data.reply, 'bot', data.products);
     } catch (_) {
       setTyping(false);
       appendMessage(i18n[lang].error, 'bot');
@@ -676,12 +818,36 @@
     }
   }
 
+  // ── Trigger proactivo en páginas de producto ───────────────────────────────
+
+  function setupProactiveTrigger() {
+    try {
+      const page = window.ShopifyAnalytics?.meta?.page;
+      if (page?.pageType !== 'product') return;
+
+      const productTitle = window.ShopifyAnalytics?.meta?.product?.title || document.title;
+      const t = i18n[lang];
+      const proactiveMsg = lang === 'es'
+        ? `¿Tienes alguna duda sobre "${productTitle}"? ¡Puedo ayudarte! 😊`
+        : `Any questions about "${productTitle}"? I'm here to help! 😊`;
+
+      // Abre el chat a los 15s si el usuario no lo ha abierto ya
+      setTimeout(() => {
+        if (!isOpen) {
+          toggleChat(true);
+          appendMessage(proactiveMsg, 'bot');
+        }
+      }, 15000);
+    } catch (_) {}
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
 
   function init() {
     if (document.getElementById('ommy-fab')) return; // already loaded
     injectStyles();
     buildWidget();
+    setupProactiveTrigger();
   }
 
   if (document.readyState === 'loading') {
