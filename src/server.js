@@ -74,13 +74,20 @@ app.get('/ommy-chat', async (req, res) => {
         code,
       }),
     });
-    const data = await tokenRes.json();
-    console.log('\n✅ ACCESS TOKEN OBTENIDO:', data.access_token);
-    console.log('Copia este token y ponlo en SHOPIFY_ACCESS_TOKEN del .env\n');
-    res.send(`<h2>Token obtenido</h2><p>Revisa la terminal para ver el token.</p><pre>${JSON.stringify(data, null, 2)}</pre>`);
+    const text = await tokenRes.text();
+    console.log('\nRespuesta Shopify OAuth:', text);
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+    if (data.access_token) {
+      console.log('\n✅ ACCESS TOKEN:', data.access_token);
+      res.send(`<h2>✅ Token obtenido</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
+    } else {
+      res.send(`<h2>❌ Error de Shopify</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
+    }
   } catch (err) {
     console.error('Error OAuth:', err);
-    res.status(500).send('Error obteniendo token');
+    res.status(500).send(`Error: ${err.message}`);
   }
 });
 
