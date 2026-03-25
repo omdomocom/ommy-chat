@@ -46,13 +46,18 @@
   const i18n = {
     es: {
       greeting: 'Hola, soy Ommy 💛',
+      greeting_user: (name) => `¡Hola de nuevo, ${name}! 💛`,
       subtitle: '¿En qué te puedo ayudar hoy?',
+      subtitle_guest: '¿En qué te puedo ayudar?',
+      login_hint: '👤 Inicia sesión para ver tus pedidos y recibir recomendaciones personalizadas.',
+      login_btn: 'Iniciar sesión',
       options: [
-        { label: '🛒 Ayuda para comprar',    msg: 'Necesito ayuda para realizar una compra' },
-        { label: '👀 Ver productos',          msg: '¿Qué productos tienen disponibles?' },
-        { label: '📖 Leer el blog',           msg: 'Quiero ver el blog de Omdomo' },
-        { label: '🤝 Unirse a la comunidad',  msg: 'Quiero saber más sobre la comunidad de Omdomo' },
+        { label: '🛒 Ayuda para comprar',    msg: 'Necesito ayuda para realizar una compra', action: 'chat' },
+        { label: '👀 Ver productos',          msg: 'Ver productos',                           action: 'collections' },
+        { label: '📖 Leer el blog',           msg: 'Quiero ver el blog de Omdomo',            action: 'chat' },
+        { label: '🤝 Unirse a la comunidad',  msg: 'Quiero saber más sobre la comunidad',     action: 'chat' },
       ],
+      collections_intro: '🗂️ Estas son nuestras categorías:',
       placeholder: 'Escribe tu mensaje...',
       send: 'Enviar',
       powered: 'Powered by Ommy',
@@ -61,13 +66,18 @@
     },
     en: {
       greeting: "Hi, I'm Ommy 💛",
+      greeting_user: (name) => `Welcome back, ${name}! 💛`,
       subtitle: 'How can I help you today?',
+      subtitle_guest: 'How can I help you?',
+      login_hint: '👤 Log in to track your orders and get personalized recommendations.',
+      login_btn: 'Log in',
       options: [
-        { label: '🛒 Help with buying',     msg: 'I need help making a purchase' },
-        { label: '👀 View products',         msg: 'What products do you have available?' },
-        { label: '📖 Read the blog',         msg: 'I want to see the Omdomo blog' },
-        { label: '🤝 Join the community',    msg: 'I want to learn more about the Omdomo community' },
+        { label: '🛒 Help with buying',     msg: 'I need help making a purchase',          action: 'chat' },
+        { label: '👀 View products',         msg: 'View products',                          action: 'collections' },
+        { label: '📖 Read the blog',         msg: 'I want to see the Omdomo blog',          action: 'chat' },
+        { label: '🤝 Join the community',    msg: 'I want to learn more about the community', action: 'chat' },
       ],
+      collections_intro: '🗂️ Here are our categories:',
       placeholder: 'Type your message...',
       send: 'Send',
       powered: 'Powered by Ommy',
@@ -285,6 +295,31 @@
       30% { transform: translateY(-6px); }
     }
 
+    /* Login hint */
+    #ommy-login-hint {
+      margin: 0 14px 8px;
+      background: #FFF9E0;
+      border: 1px solid #F5C518;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      color: #555;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #ommy-login-hint a {
+      color: #1a1a1a;
+      font-weight: 600;
+      white-space: nowrap;
+      text-decoration: none;
+      background: #F5C518;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
     /* Quick options */
     #ommy-options {
       padding: 4px 14px 10px;
@@ -438,6 +473,7 @@
         </div>
       </div>
 
+      <div id="ommy-login-hint" style="display:none"></div>
       <div id="ommy-options"></div>
 
       <div id="ommy-input-area">
@@ -458,11 +494,23 @@
 
   function applyLang() {
     const t = i18n[lang];
-    document.getElementById('ommy-greeting-text').textContent = t.greeting;
+    const customerName = CUSTOMER?.first_name;
+    const greeting = customerName ? t.greeting_user(customerName) : t.greeting;
+
+    document.getElementById('ommy-greeting-text').textContent = greeting;
     document.getElementById('ommy-header-status').textContent = lang === 'es' ? 'En línea' : 'Online';
     document.getElementById('ommy-lang-btn').textContent = t.lang_toggle;
     document.getElementById('ommy-input').placeholder = t.placeholder;
     document.getElementById('ommy-powered').textContent = t.powered;
+
+    // Hint de login solo para usuarios no registrados
+    const hintEl = document.getElementById('ommy-login-hint');
+    if (!CUSTOMER && optionsVisible) {
+      hintEl.style.display = 'flex';
+      hintEl.innerHTML = `<span>${t.login_hint}</span><a href="/account/login">${t.login_btn}</a>`;
+    } else {
+      hintEl.style.display = 'none';
+    }
 
     const optionsEl = document.getElementById('ommy-options');
     if (optionsVisible) renderOptions(optionsEl, t);
@@ -476,16 +524,41 @@
       btn.textContent = opt.label;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        sendMessage(opt.msg);
+        if (opt.action === 'collections') {
+          showCollections();
+        } else {
+          sendMessage(opt.msg);
+        }
       });
       container.appendChild(btn);
     });
+  }
+
+  async function showCollections() {
+    hideOptions();
+    const t = i18n[lang];
+    setTyping(true);
+    try {
+      const res = await fetch(`${API_URL}/collections`);
+      const data = await res.json();
+      setTyping(false);
+      if (data.collections?.length) {
+        const list = data.collections.map(c => `• ${c.title}`).join('\n');
+        appendMessage(`${t.collections_intro}\n\n${list}`, 'bot');
+      } else {
+        appendMessage(t.error, 'bot');
+      }
+    } catch (_) {
+      setTyping(false);
+      appendMessage(t.error, 'bot');
+    }
   }
 
   function hideOptions() {
     if (!optionsVisible) return;
     optionsVisible = false;
     document.getElementById('ommy-options').innerHTML = '';
+    document.getElementById('ommy-login-hint').style.display = 'none';
   }
 
   // ── Chat logic ─────────────────────────────────────────────────────────────

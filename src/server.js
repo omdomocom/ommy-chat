@@ -56,6 +56,19 @@ app.post('/chat', chatLimiter, async (req, res) => {
 });
 
 /**
+ * GET /collections — devuelve colecciones sin pasar por el LLM
+ */
+app.get('/collections', async (req, res) => {
+  try {
+    const { getCollections } = await import('./shopify.js');
+    const collections = await getCollections({ limit: 20 });
+    res.json({ collections });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * DELETE /chat/:session_id
  * Limpia el historial de conversación de una sesión
  */
