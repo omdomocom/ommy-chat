@@ -31,7 +31,7 @@ const chatLimiter = rateLimit({
 
 // Servir el widget JS como archivo estático
 app.use('/widget', express.static(join(__dirname, '../public'), {
-  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=3600'),
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'),
 }));
 
 /**
