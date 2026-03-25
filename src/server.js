@@ -41,7 +41,7 @@ app.post('/chat', async (req, res) => {
     res.json({ reply });
   } catch (err) {
     console.error('Error en el agente:', err);
-    res.status(500).json({ error: 'Error procesando tu mensaje. Por favor intenta de nuevo.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
