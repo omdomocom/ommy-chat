@@ -58,6 +58,38 @@ export async function searchProducts({ query, limit = 20 }) {
   return data.products.map(format);
 }
 
+export async function getProductFilters({ query }) {
+  // Obtiene todos los tags únicos de productos que coincidan con la búsqueda
+  const all = await shopifyFetch(`/products.json?limit=250&status=active`);
+  const q = query?.toLowerCase() || '';
+
+  const matching = q
+    ? all.products.filter(p =>
+        p.title.toLowerCase().includes(q) ||
+        p.tags.toLowerCase().includes(q) ||
+        p.product_type.toLowerCase().includes(q)
+      )
+    : all.products;
+
+  if (matching.length === 0) return { tags: [], count: 0 };
+
+  // Extrae todos los tags y los cuenta
+  const tagCount = {};
+  matching.forEach(p => {
+    p.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).forEach(tag => {
+      tagCount[tag] = (tagCount[tag] || 0) + 1;
+    });
+  });
+
+  // Ordena por frecuencia, devuelve los top 20
+  const tags = Object.entries(tagCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([tag, count]) => ({ tag, count }));
+
+  return { tags, count: matching.length, query };
+}
+
 export async function getProduct({ product_id }) {
   const data = await shopifyFetch(`/products/${product_id}.json`);
   const p = data.product;

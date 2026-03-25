@@ -2,8 +2,22 @@ import * as shopify from './shopify.js';
 
 export const toolDefinitions = [
   {
+    name: 'get_product_filters',
+    description: 'Obtiene los tags/filtros disponibles para una categoría de productos. Úsalo PRIMERO cuando el cliente busque un tipo de producto (ej: leggings, camisetas) para conocer las subcategorías disponibles y poder hacer preguntas de filtrado antes de mostrar productos concretos.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Tipo de producto a explorar (ej: leggings, camiseta, pantalón)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'search_products',
-    description: 'Busca productos en la tienda por nombre, tipo o categoría. Úsalo cuando el cliente pregunte por productos disponibles, precios o recomendaciones.',
+    description: 'Busca productos concretos. Úsalo DESPUÉS de haber depurado la búsqueda con get_product_filters y preguntas al cliente. Incluye los filtros elegidos en el query.',
     input_schema: {
       type: 'object',
       properties: {
@@ -200,6 +214,7 @@ export const toolDefinitions = [
 
 export async function executeTool(name, input) {
   switch (name) {
+    case 'get_product_filters':       return shopify.getProductFilters(input);
     case 'search_products':           return shopify.searchProducts(input);
     case 'get_product':               return shopify.getProduct(input);
     case 'get_collections':           return shopify.getCollections(input);
