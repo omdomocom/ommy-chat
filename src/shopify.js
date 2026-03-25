@@ -20,11 +20,8 @@ async function shopifyFetch(path, options = {}) {
 
 // ── PRODUCTOS ──────────────────────────────────────────────────────────────
 
-export async function searchProducts({ query, limit = 10 }) {
-  const params = new URLSearchParams({ limit });
-  if (query) params.set('title', query);
-  const data = await shopifyFetch(`/products.json?${params}`);
-  return data.products.map(p => ({
+export async function searchProducts({ query, limit = 20 }) {
+  const format = p => ({
     id: p.id,
     title: p.title,
     handle: p.handle,
@@ -37,7 +34,28 @@ export async function searchProducts({ query, limit = 10 }) {
     vendor: p.vendor,
     images: p.images?.slice(0, 2).map(i => i.src),
     variants_count: p.variants?.length,
-  }));
+  });
+
+  // Búsqueda por título
+  if (query) {
+    const params = new URLSearchParams({ limit, title: query });
+    const data = await shopifyFetch(`/products.json?${params}`);
+    if (data.products.length > 0) return data.products.map(format);
+
+    // Si no hay resultados, buscar en todos los productos y filtrar localmente
+    const all = await shopifyFetch(`/products.json?limit=250&status=active`);
+    const q = query.toLowerCase();
+    const filtered = all.products.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      p.tags.toLowerCase().includes(q) ||
+      p.product_type.toLowerCase().includes(q) ||
+      p.body_html?.toLowerCase().includes(q)
+    );
+    return filtered.slice(0, limit).map(format);
+  }
+
+  const data = await shopifyFetch(`/products.json?limit=${limit}&status=active`);
+  return data.products.map(format);
 }
 
 export async function getProduct({ product_id }) {
