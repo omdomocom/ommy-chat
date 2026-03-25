@@ -1,0 +1,16 @@
+{
+  "name": "ommy-chat",
+  "version": "1.0.0",
+  "description": "Agente de atención al cliente para Shopify powered by Claude",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "express": "^4.18.2",
+    "dotenv": "^16.4.5"
+  }
+}

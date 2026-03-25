@@ -1,0 +1,16 @@
+name = "ommy-chat-api"
+client_id = "263f53ce8cb95a512c64ee2968ddf71f"
+application_url = "https://omdomo.com/ommy-chat"
+embedded = false
+
+[access_scopes]
+scopes = "read_products,read_inventory,read_orders,write_orders,read_customers,read_checkouts,read_discounts"
+
+[auth]
+redirect_urls = ["https://omdomo.com/ommy-chat"]
+
+[webhooks]
+api_version = "2026-01"
+
+[pos]
+embedded = false
