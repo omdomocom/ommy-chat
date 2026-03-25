@@ -49,8 +49,8 @@
       greeting_user: (name) => `¡Hola de nuevo, ${name}! 💛`,
       subtitle: '¿En qué te puedo ayudar hoy?',
       subtitle_guest: '¿En qué te puedo ayudar?',
-      login_hint: '👤 Inicia sesión para ver tus pedidos y recibir recomendaciones personalizadas.',
-      login_btn: 'Iniciar sesión',
+      login_hint: '¿Buscas algo en concreto? Explora nuestro catálogo.',
+      login_btn: '👀 Ver productos',
       options: [
         { label: '🛒 Ayuda para comprar',    msg: 'Necesito ayuda para realizar una compra', action: 'chat' },
         { label: '👀 Ver productos',          msg: 'Ver productos',                           action: 'collections' },
@@ -69,8 +69,8 @@
       greeting_user: (name) => `Welcome back, ${name}! 💛`,
       subtitle: 'How can I help you today?',
       subtitle_guest: 'How can I help you?',
-      login_hint: '👤 Log in to track your orders and get personalized recommendations.',
-      login_btn: 'Log in',
+      login_hint: 'Looking for something? Explore our catalog.',
+      login_btn: '👀 View products',
       options: [
         { label: '🛒 Help with buying',     msg: 'I need help making a purchase',          action: 'chat' },
         { label: '👀 View products',         msg: 'View products',                          action: 'collections' },
@@ -310,15 +310,19 @@
       gap: 8px;
       flex-shrink: 0;
     }
-    #ommy-login-hint a {
+    #ommy-login-hint button {
       color: #1a1a1a;
       font-weight: 600;
       white-space: nowrap;
-      text-decoration: none;
       background: #F5C518;
       padding: 4px 10px;
       border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 12.5px;
+      flex-shrink: 0;
     }
+    #ommy-login-hint button:hover { opacity: 0.85; }
 
     /* Product cards */
     .ommy-product-cards {
@@ -580,9 +584,13 @@
 
     // Hint de login solo para usuarios no registrados
     const hintEl = document.getElementById('ommy-login-hint');
-    if (!CUSTOMER && optionsVisible) {
+    if (optionsVisible) {
       hintEl.style.display = 'flex';
-      hintEl.innerHTML = `<span>${t.login_hint}</span><a href="/account/login">${t.login_btn}</a>`;
+      hintEl.innerHTML = `<span>${t.login_hint}</span><button id="ommy-hint-btn">${t.login_btn}</button>`;
+      document.getElementById('ommy-hint-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showCollections();
+      });
     } else {
       hintEl.style.display = 'none';
     }
