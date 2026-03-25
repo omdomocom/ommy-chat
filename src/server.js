@@ -75,8 +75,9 @@ app.get('/ommy-chat', async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
     });
+    console.log('\nShopify status:', tokenRes.status, tokenRes.url);
     const text = await tokenRes.text();
-    console.log('\nRespuesta Shopify OAuth:', text);
+    console.log('\nRespuesta Shopify OAuth:', text.slice(0, 300));
     let data;
     try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
