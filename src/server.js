@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { OmmyAgent } from './agent.js';
@@ -19,6 +20,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Rate limiting: máx 20 mensajes por minuto por IP
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados mensajes. Espera un momento.' },
+});
+
 // Servir el widget JS como archivo estático
 app.use('/widget', express.static(join(__dirname, '../public'), {
   setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=3600'),
@@ -29,15 +39,15 @@ app.use('/widget', express.static(join(__dirname, '../public'), {
  * Body: { session_id: string, message: string, lang?: 'es'|'en' }
  * Response: { reply: string }
  */
-app.post('/chat', async (req, res) => {
-  const { session_id, message, lang } = req.body;
+app.post('/chat', chatLimiter, async (req, res) => {
+  const { session_id, message, lang, customer } = req.body;
 
   if (!session_id || !message) {
     return res.status(400).json({ error: 'Se requiere session_id y message' });
   }
 
   try {
-    const reply = await agent.chat(session_id, message, lang);
+    const reply = await agent.chat(session_id, message, lang, customer);
     res.json({ reply });
   } catch (err) {
     console.error('Error en el agente:', err);

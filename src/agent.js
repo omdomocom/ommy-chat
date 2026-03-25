@@ -81,11 +81,16 @@ export class OmmyAgent {
     this.sessions.delete(sessionId);
   }
 
-  async chat(sessionId, userMessage, lang = 'es') {
+  async chat(sessionId, userMessage, lang = 'es', customer = null) {
     const session = this.getOrCreateSession(sessionId);
     session.messages.push({ role: 'user', content: userMessage });
 
-    const systemPrompt = getSystemPrompt(lang);
+    let systemPrompt = getSystemPrompt(lang);
+    if (customer?.id) {
+      const name = customer.first_name ? `, su nombre es ${customer.first_name}` : '';
+      const spent = customer.total_spent ? `, ha gastado ${customer.total_spent} en total` : '';
+      systemPrompt += `\n\nCliente identificado${name}${spent}. Su ID de Shopify es ${customer.id}. Puedes buscar sus pedidos directamente con get_orders_by_customer sin pedirle el email.`;
+    }
 
     let response = await client.messages.create({
       model: 'claude-sonnet-4-6',

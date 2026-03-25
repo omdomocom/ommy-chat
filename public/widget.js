@@ -5,6 +5,13 @@
   const API_URL = (script && script.getAttribute('data-api-url')) || 'https://api.omdomo.com';
   const SESSION_ID = 'ommy_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 
+  // Cliente logueado en Shopify (disponible en el storefront)
+  const CUSTOMER = (typeof window !== 'undefined' && window.__st?.cid)
+    ? { id: window.__st.cid }
+    : (window.ShopifyAnalytics?.meta?.page?.customerId
+        ? { id: window.ShopifyAnalytics.meta.page.customerId }
+        : null);
+
   // ── i18n ──────────────────────────────────────────────────────────────────
 
   const i18n = {
@@ -50,21 +57,30 @@
       width: 60px;
       height: 60px;
       border-radius: 50%;
-      background: #F5C518;
-      border: none;
+      background: rgba(245, 197, 24, 0.82);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1.5px solid rgba(255, 255, 255, 0.45);
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      box-shadow: 0 4px 20px rgba(245, 197, 24, 0.45), 0 2px 8px rgba(0,0,0,0.12);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 99998;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      animation: ommy-pulse 3s ease-in-out infinite;
     }
     #ommy-fab:hover {
-      transform: scale(1.08);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.22);
+      transform: scale(1.1);
+      background: rgba(245, 197, 24, 0.95);
+      box-shadow: 0 6px 28px rgba(245, 197, 24, 0.6), 0 4px 12px rgba(0,0,0,0.15);
+      animation: none;
     }
     #ommy-fab svg { pointer-events: none; }
+    @keyframes ommy-pulse {
+      0%, 100% { box-shadow: 0 4px 20px rgba(245,197,24,0.45), 0 0 0 0 rgba(245,197,24,0.4); }
+      50% { box-shadow: 0 4px 20px rgba(245,197,24,0.45), 0 0 0 10px rgba(245,197,24,0); }
+    }
 
     #ommy-badge {
       position: absolute;
@@ -429,7 +445,10 @@
       const btn = document.createElement('button');
       btn.className = 'ommy-option-btn';
       btn.textContent = opt.label;
-      btn.addEventListener('click', () => sendMessage(opt.msg));
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sendMessage(opt.msg);
+      });
       container.appendChild(btn);
     });
   }
@@ -485,7 +504,7 @@
       const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: SESSION_ID, message: text, lang }),
+        body: JSON.stringify({ session_id: SESSION_ID, message: text, lang, customer: CUSTOMER }),
       });
 
       if (!res.ok) throw new Error('Network error');
