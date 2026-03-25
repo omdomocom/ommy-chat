@@ -40,14 +40,14 @@ app.use('/widget', express.static(join(__dirname, '../public'), {
  * Response: { reply: string }
  */
 app.post('/chat', chatLimiter, async (req, res) => {
-  const { session_id, message, lang, customer } = req.body;
+  const { session_id, message, lang, customer, viewed_products } = req.body;
 
   if (!session_id || !message) {
     return res.status(400).json({ error: 'Se requiere session_id y message' });
   }
 
   try {
-    const reply = await agent.chat(session_id, message, lang, customer);
+    const reply = await agent.chat(session_id, message, lang, customer, viewed_products);
     res.json({ reply });
   } catch (err) {
     console.error('Error en el agente:', err);

@@ -12,6 +12,35 @@
         ? { id: window.ShopifyAnalytics.meta.page.customerId }
         : null);
 
+  // ── Tracking de productos vistos ───────────────────────────────────────────
+  const STORAGE_KEY = 'ommy_viewed';
+  const MAX_VIEWED = 10;
+
+  function getViewedProducts() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+  }
+
+  function trackCurrentProduct() {
+    try {
+      const page = window.ShopifyAnalytics?.meta?.page;
+      const product = window.ShopifyAnalytics?.meta?.product || window.meta?.product;
+
+      if (page?.pageType !== 'product' && !product) return;
+
+      const id = product?.id || page?.resourceId;
+      const title = product?.title || document.title;
+      const handle = window.location.pathname.split('/products/')[1]?.split('?')[0];
+
+      if (!id && !handle) return;
+
+      const viewed = getViewedProducts().filter(p => p.id !== id && p.handle !== handle);
+      viewed.unshift({ id, title, handle, ts: Date.now() });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(viewed.slice(0, MAX_VIEWED)));
+    } catch (_) {}
+  }
+
+  trackCurrentProduct();
+
   // ── i18n ──────────────────────────────────────────────────────────────────
 
   const i18n = {
@@ -504,7 +533,13 @@
       const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: SESSION_ID, message: text, lang, customer: CUSTOMER }),
+        body: JSON.stringify({
+          session_id: SESSION_ID,
+          message: text,
+          lang,
+          customer: CUSTOMER,
+          viewed_products: getViewedProducts().slice(0, 5),
+        }),
       });
 
       if (!res.ok) throw new Error('Network error');
